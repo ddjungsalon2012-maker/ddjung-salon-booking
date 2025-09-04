@@ -1,10 +1,11 @@
 'use client';
-import Link from 'next/link';
+
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import PromptPayQR from '@/components/PromptPayQR';
 
-type PageProps = { params: { id: string } };
 type Booking = {
   name: string;
   phone: string;
@@ -16,47 +17,94 @@ type Booking = {
   slipUrl?: string;
 };
 
-export default function SuccessPage({ params }: PageProps) {
+export default function SuccessPage({ params }: { params: { id: string } }) {
   const [data, setData] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
     async function run() {
-      const ref = doc(db,'bookings', params.id);
-      const snap = await getDoc(ref);
-      setData(snap.exists() ? (snap.data() as Booking) : null);
-      setLoading(false);
+      try {
+        const snap = await getDoc(doc(db, 'bookings', params.id));
+        if (!snap.exists()) {
+          setNotFound(true);
+        } else {
+          setData(snap.data() as Booking);
+        }
+      } finally {
+        setLoading(false);
+      }
     }
     run();
   }, [params.id]);
 
-  if (loading) return <main className="p-6">Loading...</main>;
-  if (!data) return <main className="p-6">ไม่พบข้อมูลการจอง</main>;
+  if (loading) {
+    return (
+      <main className="min-h-screen flex items-center justify-center text-gray-300">
+        กำลังโหลด...
+      </main>
+    );
+  }
+
+  if (notFound || !data) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <div className="rounded-2xl bg-midnight/60 border border-gray-700 p-6 text-center">
+          <p className="text-white mb-4">ไม่พบข้อมูลการจอง</p>
+          <Link href="/" className="btn-primary inline-block">กลับหน้าแรก</Link>
+        </div>
+      </main>
+    );
+  }
+
+  const deposit = data.deposit ?? 500;
 
   return (
-    <main className="max-w-2xl mx-auto p-6 text-gray-100">
-      <h1 className="text-3xl font-extrabold tracking-tight text-gold mb-4">จองสำเร็จ 🎉</h1>
+    <main className="max-w-3xl mx-auto p-6">
+      <div className="rounded-2xl bg-midnight/60 border border-gray-700 p-6">
+        <h1 className="text-2xl font-bold text-white">จองสำเร็จ 🎉</h1>
+        <p className="text-sm text-gray-300 mt-2">
+          รหัสการจอง: <span className="font-mono bg-black/40 px-2 py-1 rounded">{params.id}</span>
+        </p>
 
-      <div className="rounded-2xl p-5 bg-midnight/60 border border-gray-700/50">
-        <p className="mb-3">รหัสการจอง: <span className="font-mono bg-black/40 px-2 py-1 rounded">{params.id}</span></p>
-
-        <div className="grid grid-cols-2 gap-6 text-sm">
-          <div><div className="text-gray-400">ชื่อ</div><div className="font-medium">{data.name}</div></div>
-          <div><div className="text-gray-400">เบอร์โทร</div><div className="font-medium">{data.phone}</div></div>
-          <div><div className="text-gray-400">บริการ</div><div className="font-medium">{data.service}</div></div>
-          <div><div className="text-gray-400">วันเวลา</div><div className="font-medium">{data.date} {data.time}</div></div>
-          <div><div className="text-gray-400">สถานะ</div><div className="inline-block bg-black text-white rounded px-2 py-1">{data.status}</div></div>
-          <div><div className="text-gray-400">มัดจำ</div><div className="font-medium">{data.deposit ?? 500} บาท</div></div>
-          <div className="col-span-2">
-            <div className="text-gray-400">สลิป</div>
-            {data.slipUrl ? <a href={data.slipUrl} target="_blank" className="text-blue-400 underline">เปิดสลิป</a> : <span>-</span>}
+        <div className="grid md:grid-cols-2 gap-5 mt-6">
+          <div className="space-y-2 text-gray-200">
+            <Row label="ชื่อ" value={data.name} />
+            <Row label="เบอร์โทร" value={data.phone} />
+            <Row label="บริการ" value={data.service} />
+            <Row label="วันเวลา" value={`${data.date} ${data.time}`} />
+            <Row
+              label="สถานะ"
+              value={
+                <span className="inline-block px-2 py-1 text-xs rounded bg-gray-800 border border-gray-600">
+                  {data.status}
+                </span>
+              }
+            />
+            <Row label="มัดจำ" value={`${deposit.toLocaleString()} บาท`} />
           </div>
+
+          {/* กล่อง QR PromptPay */}
+          <PromptPayQR amount={deposit} />
         </div>
 
-        <div className="mt-6">
-          <Link href="/" className="inline-block bg-gradient-to-r from-gold to-royal text-black px-4 py-2 rounded-lg font-semibold">จองใหม่อีกครั้ง</Link>
+        <p className="text-sm text-gray-400 mt-4">
+          โอนแล้วสามารถส่งสลิปให้แอดมินหรือแนบสลิปในระบบได้
+        </p>
+
+        <div className="mt-6 flex gap-3">
+          <Link href="/" className="btn-primary">จองใหม่อีกครั้ง</Link>
         </div>
       </div>
     </main>
+  );
+}
+
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="w-24 text-gray-400">{label}</div>
+      <div className="flex-1 text-white">{value}</div>
+    </div>
   );
 }
