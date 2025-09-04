@@ -13,6 +13,7 @@ type BookingDoc = {
   time: string;
   status: 'Pending' | 'Confirmed' | 'Cancelled';
   createdAt?: Timestamp;
+  slipUrl?: string;
 };
 
 export default function AdminPage(){
@@ -43,6 +44,7 @@ export default function AdminPage(){
               <th>วัน</th>
               <th>เวลา</th>
               <th>สถานะ</th>
+              <th>สลิป</th>
               <th></th>
             </tr>
           </thead>
@@ -54,7 +56,15 @@ export default function AdminPage(){
                 <td>{it.service}</td>
                 <td>{it.date}</td>
                 <td>{it.time}</td>
-                <td>{it.status}</td>
+                <td>
+                  <span className="inline-block px-2 py-1 rounded text-white"
+                        style={{backgroundColor: it.status==='Confirmed' ? '#16a34a' : it.status==='Cancelled' ? '#ef4444' : '#4b5563'}}>
+                    {it.status}
+                  </span>
+                </td>
+                <td>
+                  {it.slipUrl ? <a className="text-blue-600 underline" href={it.slipUrl} target="_blank">เปิด</a> : '-'}
+                </td>
                 <td className="space-x-2">
                   <button onClick={()=>setStatus(it.id,'Confirmed')} className="px-2 py-1 rounded bg-green-600 text-white">Confirm</button>
                   <button onClick={()=>setStatus(it.id,'Cancelled')} className="px-2 py-1 rounded bg-red-600 text-white">Cancel</button>

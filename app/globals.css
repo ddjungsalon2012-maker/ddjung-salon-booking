@@ -2,18 +2,7 @@
 
 /* custom styles */
 body {
-  @apply bg-white text-gray-900;
-  font-family: 'Inter', sans-serif;
-}
-
-.btn-primary {
-  @apply px-4 py-2 rounded-lg font-semibold text-white bg-black hover:bg-gray-800;
-}
-
-.btn-secondary {
-  @apply px-4 py-2 rounded-lg font-semibold border border-gray-300 text-gray-700 hover:bg-gray-100;
-}
-
-.btn-gold {
-  @apply px-4 py-2 rounded-lg font-semibold text-white bg-yellow-500 hover:bg-yellow-600;
+  background: radial-gradient(80% 60% at 50% 0%, #0b1220 0%, #0b1220 40%, #0e1628 100%) fixed;
+  color: #e5e7eb; /* text-gray-200 */
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
 }
