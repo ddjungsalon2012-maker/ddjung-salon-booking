@@ -6,3 +6,18 @@ body {
   color: #e5e7eb; /* text-gray-200 */
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
 }
+.btn-primary {
+  @apply rounded-lg bg-black px-5 py-2 font-semibold text-white shadow hover:bg-gray-800 transition;
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+.btn-secondary {
+  @apply rounded-lg bg-white/10 px-4 py-2 font-medium text-white hover:bg-white/20 transition;
+  border: 1px solid rgba(255,255,255,.12);
+}
+/* Force native form controls to render in dark color scheme */
+:root { color-scheme: dark; }
+select, input, textarea, option { color-scheme: dark; }
+
+/* (เสริม) สีข้อความให้สว่างในธีมมืด */
+select, input, textarea { color: #fff; }
