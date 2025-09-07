@@ -1,16 +1,22 @@
 'use client';
 
-type Props = { id: string };
+import { useEffect, useState } from 'react';
 
-export default function ClientPage({ id }: Props) {
+export default function ClientPage({ id }: { id: string }) {
+  // logic ฝั่ง client ของคุณ เช่น fetch ข้อมูล ตาม id
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    setReady(true);
+  }, [id]);
+
   return (
-    <main className="min-h-screen flex items-center justify-center px-4 py-10 text-gray-100">
-      <div className="w-full max-w-2xl bg-white/5 backdrop-blur rounded-2xl p-6 shadow">
-        <h1 className="text-2xl font-bold mb-4">จองสำเร็จ 🎉</h1>
-        <p className="mb-6">
-          รหัสการจอง:{' '}
-          <span className="font-mono bg-white/10 px-2 py-1 rounded">{id}</span>
-        </p>
+    <main className="min-h-screen px-4 py-10 text-gray-100">
+      <div className="mx-auto max-w-3xl">
+        <h1 className="text-2xl font-bold mb-4">รายละเอียดการจอง</h1>
+        <p className="font-mono">Booking ID: {id}</p>
+        {!ready && <p>กำลังโหลด…</p>}
+        {/* ส่วนแสดงผลอื่น ๆ ของคุณ */}
       </div>
     </main>
   );
