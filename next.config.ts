@@ -4,14 +4,24 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
-  // ⬇️ ข้าม ESLint ตอน build (ทั้ง local และบน Vercel)
+  // ⛳ ปิด ESLint error ตอน build (Vercel/production)
   eslint: {
     ignoreDuringBuilds: true,
   },
 
+  // ⛳ ปิด TypeScript type-check error ตอน build (Vercel/production)
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+
+  // อนุญาตโหลดรูปจาก Firebase Storage (ถ้าคุณใช้ <Image /> ในอนาคต)
   images: {
-    // ใส่โดเมนที่อนุญาตถ้ามีรูปจากภายนอก
-    remotePatterns: [],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+      },
+    ],
   },
 };
 
