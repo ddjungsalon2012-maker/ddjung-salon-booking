@@ -2,13 +2,8 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  // ❌ ห้ามมี output: 'export' เด็ดขาด (ลบทิ้งเลย)
-  
-  eslint: { ignoreDuringBuilds: true },
-  typescript: { ignoreBuildErrors: true },
-
+  // ⛳️ ลบส่วน eslint และ typescript ออกไปก่อนเพื่อให้ผ่านการเช็ค Type ของตัวแปร NextConfig
   images: {
-    // ❌ ห้ามมี unoptimized: true (ลบทิ้งเลย)
     remotePatterns: [
       {
         protocol: 'https',
