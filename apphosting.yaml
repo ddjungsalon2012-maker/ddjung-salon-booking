@@ -1,23 +1,25 @@
 # Settings for Backend (on Cloud Run).
-# See https://firebase.google.com/docs/app-hosting/configure#cloud-run
 runConfig:
   minInstances: 0
-  # maxInstances: 100
-  # concurrency: 80
-  # cpu: 1
-  # memoryMiB: 512
+  memoryMiB: 512
 
 # Environment variables and secrets.
-# env:
-  # Configure environment variables.
-  # See https://firebase.google.com/docs/app-hosting/configure#user-defined-environment
-  # - variable: MESSAGE
-  #   value: Hello world!
-  #   availability:
-  #     - BUILD
-  #     - RUNTIME
-
-  # Grant access to secrets in Cloud Secret Manager.
-  # See https://firebase.google.com/docs/app-hosting/configure#secret-parameters
-  # - variable: MY_SECRET
-  #   secret: mySecretRef
+env:
+  # บรรทัดด้านล่างนี้คือส่วนสำคัญที่ทำให้ Build ผ่าน
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: "AIzaSyB7UrNib4nu1O1b6HtOjOUpKgcM8g1TU84" # <--- สำคัญมาก: เอา API Key จริงๆ จาก Firebase Settings ของคุณมาใส่ตรงนี้
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: "ddjung-salon-v2.firebaseapp.com"
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: "ddjung-salon-v2"
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: "ddjung-salon-v2.firebasestorage.app"
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "692498039840" # <--- ดูตัวเลขนี้ในไฟล์ firebaseConfig ของคุณแล้วมาเปลี่ยนให้ตรง
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "1:692498039840:web:23bd3a15aed9f7bf052845" # <--- เอา App ID จริงๆ ของคุณมาใส่ตรงนี้
+    
+    # กำหนดให้ใช้ค่าเหล่านี้ได้ทั้งตอนสร้างเว็บ (Build) และตอนคนกดเข้าเว็บ (Runtime)
+    availability:
+      - BUILD
+      - RUNTIME
