@@ -2,22 +2,13 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-
-  // ✅ ลบ output: 'export' ออกแล้ว เพื่อให้รองรับหน้า Dynamic (/success/[id])
+  // ❌ ห้ามมี output: 'export' เด็ดขาด (ลบทิ้งเลย)
   
-  // ⛳ ปิด ESLint error ตอน build
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
 
-  // ⛳ ปิด TypeScript type-check error ตอน build
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-
-  // อนุญาตโหลดรูปจาก Firebase Storage
   images: {
-    // ✅ เอา unoptimized: true ออกได้เลยครับ เพราะ App Hosting รองรับการจัดการรูปภาพแบบปกติแล้ว
+    // ❌ ห้ามมี unoptimized: true (ลบทิ้งเลย)
     remotePatterns: [
       {
         protocol: 'https',
