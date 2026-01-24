@@ -18,8 +18,6 @@ env:
     value: "692498039840"
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
     value: "1:692498039840:web:23bd3a15aed9f7bf052b45"
-  
-  # แก้ไขส่วน Admin Email ให้เป็นรูปแบบนี้ (ขยับออกมาให้ตรงกับตัวแปรอื่น)
   - variable: NEXT_PUBLIC_ADMIN_EMAIL
     value: "ddjungsalon.2012@gmail.com"
     availability:
