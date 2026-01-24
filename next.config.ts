@@ -1,21 +1,23 @@
-// next.config.ts
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
-  // ⛳ ปิด ESLint error ตอน build (Vercel/production)
+  // ✅ ลบ output: 'export' ออกแล้ว เพื่อให้รองรับหน้า Dynamic (/success/[id])
+  
+  // ⛳ ปิด ESLint error ตอน build
   eslint: {
     ignoreDuringBuilds: true,
   },
 
-  // ⛳ ปิด TypeScript type-check error ตอน build (Vercel/production)
+  // ⛳ ปิด TypeScript type-check error ตอน build
   typescript: {
     ignoreBuildErrors: true,
   },
 
-  // อนุญาตโหลดรูปจาก Firebase Storage (ถ้าคุณใช้ <Image /> ในอนาคต)
+  // อนุญาตโหลดรูปจาก Firebase Storage
   images: {
+    // ✅ เอา unoptimized: true ออกได้เลยครับ เพราะ App Hosting รองรับการจัดการรูปภาพแบบปกติแล้ว
     remotePatterns: [
       {
         protocol: 'https',

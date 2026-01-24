@@ -7,6 +7,8 @@ import PromptPayQR from '@/components/PromptPayQR';
 import { db } from '@/lib/firebase';
 import { addBooking, BookingInput, checkSlotAvailable } from '@/lib/booking';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+// app/admin/page.tsx  (Server Component)
+import { redirect } from 'next/navigation';
 
 // client-only uploader
 const SlipUploadInline = dynamic(() => import('@/components/SlipUploadInline'), { ssr: false });

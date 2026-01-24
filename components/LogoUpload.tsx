@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/lib/firebase';
+import { getAuth } from 'firebase/auth';
 
 type Props = {
   value?: string;
@@ -17,18 +18,36 @@ export default function LogoUpload({ value, onChange }: Props) {
   useEffect(() => setUrl(value), [value]);
 
   async function doUpload() {
-    if (!file) return;
+    if (!file) {
+      alert('กรุณาเลือกไฟล์ก่อน');
+      return;
+    }
     if (!/image\/(png|jpeg)/.test(file.type)) {
-      alert('อัปโหลดได้เฉพาะ .png หรือ .jpg เท่านั้น'); return;
+      alert('อัปโหลดได้เฉพาะ .png หรือ .jpg เท่านั้น');
+      return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      alert('ไฟล์ต้องไม่เกิน 5MB'); return;
+      alert('ไฟล์ต้องไม่เกิน 5MB');
+      return;
     }
+
     try {
       setUploading(true);
+
+      // ต้องล็อกอินเป็นแอดมิน (ตาม Storage rules)
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (!user) {
+        alert('กรุณาเข้าสู่ระบบแอดมินก่อนอัปโหลดโลโก้');
+        return;
+      }
+      await user.getIdToken(true); // refresh token
+
       const ext = file.type === 'image/png' ? 'png' : 'jpg';
-      const path = `logo/logo.${ext}`; // path คงที่: เขียนทับโลโก้เดิม
+      // ✅ ให้ตรงกับ rules: logos/**
+      const path = `logos/logo.${ext}`;
       const rf = ref(storage, path);
+
       await uploadBytes(rf, file);
       const download = await getDownloadURL(rf);
       setUrl(download);
@@ -48,19 +67,37 @@ export default function LogoUpload({ value, onChange }: Props) {
           {url ? (
             <img src={url} alt="โลโก้" className="h-full w-full object-contain" />
           ) : (
-            <span className="text-xs text-gray-400">No Logo</span>
+            <span className="text-xs text-gray-400">โลโก้</span>
           )}
         </div>
-        <input
-          type="file"
-          accept="image/png,image/jpeg"
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
-          className="text-sm"
-        />
-        <button onClick={doUpload} disabled={!file || uploading} className="btn-secondary">
-          {uploading ? 'กำลังอัปโหลด...' : 'อัปโหลดโลโก้'}
+
+        <label className="text-sm">
+          <input
+            type="file"
+            accept="image/png,image/jpeg"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            className="hidden"
+            id="logo-input"
+          />
+          <span className="btn-secondary cursor-pointer" onClick={() => document.getElementById('logo-input')?.click()}>
+            เลือกไฟล์
+          </span>
+          <span className="ml-3 text-gray-300">
+            {file ? file.name : 'ไม่มีไฟล์ที่เลือก'}
+          </span>
+        </label>
+
+        {/* ✅ type="button" กันฟอร์ม submit */}
+        <button
+          type="button"
+          onClick={doUpload}
+          disabled={!file || uploading}
+          className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {uploading ? 'กำลังอัปโหลด…' : 'อัปโหลดโลโก้'}
         </button>
       </div>
+
       <p className="text-xs text-gray-400">รองรับ .png / .jpg ขนาดไม่เกิน 5MB</p>
     </div>
   );

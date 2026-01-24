@@ -1,55 +1,36 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { auth } from '@/lib/firebase';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, User } from 'firebase/auth';
 
-export default function AdminGate({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [err, setErr] = useState<string>('');
-  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+import { ReactNode, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+
+const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'ddjungsalon.2012@gmail.com';
+
+export default function AdminGuard({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const [checking, setChecking] = useState(true);
+  const [ok, setOk] = useState(false);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    const unsub = onAuthStateChanged(auth, (user) => {
+      const isAdmin = !!user && user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+      setOk(isAdmin);
+      setChecking(false);
+      if (!isAdmin) {
+        router.replace('/admin/login');
+      }
+    });
     return () => unsub();
-  }, []);
+  }, [router]);
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setErr('');
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (e: unknown) {
-      const msg = (e as { message?: string }).message ?? 'เข้าสู่ระบบไม่สำเร็จ';
-      setErr(msg);
-    }
-  }
-
-  if (!user || user.email !== adminEmail) {
+  if (checking) {
     return (
-      <div className="max-w-sm mx-auto p-6">
-        <h1 className="text-xl font-bold mb-3">Admin Login</h1>
-        <form onSubmit={onSubmit} className="space-y-3">
-          <input className="w-full border rounded-xl px-3 py-2" placeholder="Email"
-                 value={email} onChange={e=>setEmail(e.target.value)} />
-          <input type="password" className="w-full border rounded-xl px-3 py-2" placeholder="Password"
-                 value={password} onChange={e=>setPassword(e.target.value)} />
-          {err && <p className="text-sm text-red-600">{err}</p>}
-          <button className="w-full bg-black text-white rounded-xl py-2">เข้าสู่ระบบ</button>
-        </form>
-      </div>
+      <main className="min-h-screen grid place-items-center text-gray-200">
+        กำลังตรวจสอบสิทธิ์…
+      </main>
     );
   }
 
-  return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">แดชบอร์ดแอดมิน</h1>
-        <div className="text-sm text-gray-600">{user.email}</div>
-        <button onClick={()=>signOut(auth)} className="text-sm text-blue-600">ออกจากระบบ</button>
-      </div>
-      {children}
-    </div>
-  );
+  return ok ? <>{children}</> : null;
 }
