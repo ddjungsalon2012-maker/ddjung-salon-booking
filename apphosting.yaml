@@ -24,7 +24,7 @@ env:
       - BUILD
       - RUNTIME
       - variable: NEXT_PUBLIC_ADMIN_EMAIL
-    value: "ddjungsalon.2012@gmail.com"# # ใส่อีเมลที่คุณจะใช้ล็อกอินตรงนี้
+    value: "ddjungsalon.2012@gmail.com"  # ใส่อีเมลที่คุณจะใช้ล็อกอินตรงนี้
     availability:
       - BUILD
       - RUNTIME
