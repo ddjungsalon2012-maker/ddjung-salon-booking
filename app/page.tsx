@@ -3,14 +3,7 @@ import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import {
-  doc,
-  getDoc,
-  collection,
-  query,
-  where,
-  getDocs,
-} from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { addBooking } from '@/lib/booking';
 import PromptPayQR from '@/components/PromptPayQR';
 import Banner from '@/components/Banner';
@@ -171,13 +164,22 @@ export default function Home() {
       setBookedTimes([]);
       return;
     }
+
     const fetchBookedTimes = async () => {
       setLoadingBookings(true);
       try {
-        const qy = query(collection(db, 'bookings'), where('date', '==', input.date));
-        const qs = await getDocs(qy);
-        const times = qs.docs.map((d) => (d.data().time as string) || '');
-        setBookedTimes(times.filter(Boolean));
+        const res = await fetch(
+          `/api/booked-times?date=${encodeURIComponent(input.date)}`,
+          { cache: 'no-store' }
+        );
+        if (!res.ok) {
+          // อย่าให้หน้าแตก แค่โชว์ว่าว่างทั้งหมด
+          console.error('Error fetching booked times:', await res.text());
+          setBookedTimes([]);
+          return;
+        }
+        const data = (await res.json()) as { times?: string[] };
+        setBookedTimes(Array.isArray(data.times) ? data.times : []);
       } catch (err) {
         console.error('Error fetching booked times:', err);
         setBookedTimes([]);
@@ -185,6 +187,7 @@ export default function Home() {
         setLoadingBookings(false);
       }
     };
+
     fetchBookedTimes();
   }, [input.date]);
 
@@ -313,8 +316,10 @@ export default function Home() {
                 <SelectFull
                   options={timeOptions.filter((t: string) => !bookedTimes.includes(t))}
                   value={input.time}
-                  onChange={(v) => onChangeTime(v)}  // ตรวจช่วงเวลาเบื้องต้น
-                  placeholder="เลือกเวลา"
+                  onChange={(v) => onChangeTime(v)}
+                  placeholder={
+                    loadingBookings ? 'กำลังโหลดเวลาว่าง…' : 'เลือกเวลา'
+                  }
                   itemHeight={48}
                 />
                 <p className="text-xs text-gray-400 mt-1">
@@ -350,10 +355,7 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="flex items-center justify-center">
-                  <PromptPayQR
-                    accountNo={settings.promptpay}
-                    amount={settings.deposit}
-                  />
+                  <PromptPayQR accountNo={settings.promptpay} amount={settings.deposit} />
                 </div>
               </div>
             </section>
