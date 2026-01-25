@@ -26,4 +26,3 @@ env:
   - variable: NEXT_PUBLIC_ADMIN_EMAIL
     value: "ddjungsalon.2012@gmail.com"
     availability: [BUILD, RUNTIME]
-    
