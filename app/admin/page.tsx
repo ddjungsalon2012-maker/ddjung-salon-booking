@@ -4,18 +4,16 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import PromptPayQR from '@/components/PromptPayQR';
+import { addBooking, BookingInput } from '@/lib/booking';
 import { db } from '@/lib/firebase';
-import { addBooking, BookingInput, checkSlotAvailable } from '@/lib/booking';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-// app/admin/page.tsx  (Server Component)
-import { redirect } from 'next/navigation';
+import { doc, getDoc } from 'firebase/firestore';
 
 // client-only uploader
 const SlipUploadInline = dynamic(() => import('@/components/SlipUploadInline'), { ssr: false });
 
 type SettingsDoc = {
   shopName?: string;
-  openHours?: string;   // เช่น "09:30–15:30"
+  openHours?: string; // เช่น "09:30–15:30"
   promptpay?: string;
   deposit?: number;
   services?: string[];
@@ -26,13 +24,13 @@ type Input = {
   name: string;
   phone: string;
   service: string;
-  date: string;  // yyyy-mm-dd
-  time: string;  // HH:mm
+  date: string; // yyyy-mm-dd
+  time: string; // HH:mm
   notes?: string;
   slipUrl: string;
 };
 
-const DEFAULT_SERVICES = ['ดัดวอลลุ่ม','ทำสี','ทรีทเมนต์','สระไดร์','ตัดซอย'];
+const DEFAULT_SERVICES = ['ดัดวอลลุ่ม', 'ทำสี', 'ทรีทเมนต์', 'สระไดร์', 'ตัดซอย'];
 const DEFAULT_DEPOSIT = 500;
 
 /* ========================= helpers ========================= */
@@ -43,7 +41,7 @@ function toMinutes(hhmm: string) {
 function fromMinutes(mins: number) {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 /** รับ "09:30–15:30" -> { start: '09:30', end: '15:30' }; ถ้า parse ไม่ได้ใช้ดีฟอลต์ 09:00–20:00 */
 function parseHours(range?: string) {
@@ -61,7 +59,14 @@ function buildTimes(startHHMM: string, endHHMM: string, step = 30) {
     t += step;
   }
   // ตัดเวลาที่ชนเวลาปิดออก
-  return out.filter(v => toMinutes(v) + step <= end);
+  return out.filter((v) => toMinutes(v) + step <= end);
+}
+
+async function fetchBookedTimes(date: string): Promise<string[]> {
+  const res = await fetch(`/api/booked-times?date=${encodeURIComponent(date)}`, { cache: 'no-store' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error ?? 'โหลดเวลาที่ถูกจองไม่สำเร็จ');
+  return Array.isArray(data?.times) ? data.times : [];
 }
 
 /* ========================= Page ========================= */
@@ -104,7 +109,7 @@ export default function Home() {
       const yyyy = d.getFullYear();
       const mm = String(d.getMonth() + 1).padStart(2, '0');
       const dd = String(d.getDate()).padStart(2, '0');
-      setInput(prev => ({ ...prev, date: `${yyyy}-${mm}-${dd}` }));
+      setInput((prev) => ({ ...prev, date: `${yyyy}-${mm}-${dd}` }));
     }
   }, [mounted, input.date]);
 
@@ -118,34 +123,34 @@ export default function Home() {
   useEffect(() => {
     if (!timeOptions.length) return;
     if (!input.time || !timeOptions.includes(input.time)) {
-      setInput(prev => ({ ...prev, time: '' }));
+      setInput((prev) => ({ ...prev, time: '' }));
     }
-  }, [timeOptions]); // eslint-disable-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeOptions]);
 
-  // ======= โหลด "เวลาที่ถูกจองแล้ว" ของวันที่เลือก (Pending + Confirmed) -> เพื่อซ่อนจากลิสต์ =======
+  // ======= โหลด "เวลาที่ถูกจองแล้ว" ของวันที่เลือก ผ่าน API -> เพื่อซ่อนจากลิสต์ =======
   const [bookedTimes, setBookedTimes] = useState<Set<string>>(new Set());
+  const [loadingBookings, setLoadingBookings] = useState(false);
+
   useEffect(() => {
     if (!input.date) return;
     (async () => {
+      setLoadingBookings(true);
       try {
-        const ref = collection(db, 'bookings');
-        const q1 = query(ref, where('date', '==', input.date), where('status', '==', 'Pending'));
-        const q2 = query(ref, where('date', '==', input.date), where('status', '==', 'Confirmed'));
-        const [sp, sc] = await Promise.all([getDocs(q1), getDocs(q2)]);
-        const taken = new Set<string>();
-        sp.forEach(d => { const t = d.get('time'); if (typeof t === 'string') taken.add(t); });
-        sc.forEach(d => { const t = d.get('time'); if (typeof t === 'string') taken.add(t); });
-        setBookedTimes(taken);
+        const times = await fetchBookedTimes(input.date);
+        setBookedTimes(new Set(times));
       } catch (e) {
         console.error('โหลดเวลาที่ถูกจองไม่สำเร็จ', e);
         setBookedTimes(new Set());
+      } finally {
+        setLoadingBookings(false);
       }
     })();
   }, [input.date]);
 
   const adminEmail = useMemo(() => process.env.NEXT_PUBLIC_ADMIN_EMAIL || '', []);
 
-  // ======= ตรวจทันทีตอนเปลี่ยนเวลา (เรียกไปเช็กตรง ๆ กับ Firestore) =======
+  // ======= เปลี่ยนเวลา: เช็กกับรายการ bookedTimes ที่โหลดมา =======
   async function onChangeTime(nextTime: string) {
     if (!input.date) {
       alert('กรุณาเลือกวันที่ก่อน');
@@ -156,16 +161,19 @@ export default function Home() {
       return;
     }
 
-    // ตรวจแบบเรียลไทม์กับฐานข้อมูล (กันกรณีลิสต์ยังไม่อัปเดต)
-    const ok = await checkSlotAvailable(input.date, nextTime);
-    if (!ok) {
-      alert('ช่วงเวลานี้มีการจองแล้ว กรุณาเลือกเวลาอื่น');
-      // รีเซ็ตกลับค่าว่าง
-      setInput(prev => ({ ...prev, time: '' }));
+    // กันกรณีข้อมูลยังโหลดไม่ทัน
+    if (loadingBookings) {
+      alert('กำลังโหลดเวลาที่ว่าง กรุณารอสักครู่');
       return;
     }
 
-    setInput(prev => ({ ...prev, time: nextTime }));
+    if (bookedTimes.has(nextTime)) {
+      alert('ช่วงเวลานี้มีการจองแล้ว กรุณาเลือกเวลาอื่น');
+      setInput((prev) => ({ ...prev, time: '' }));
+      return;
+    }
+
+    setInput((prev) => ({ ...prev, time: nextTime }));
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -178,14 +186,24 @@ export default function Home() {
     if (!timeOptions.includes(input.time)) {
       return alert('เวลาที่เลือกอยู่นอกช่วงเวลาทำการ กรุณาเลือกใหม่');
     }
-    // กันการจองซ้ำช่วงเวลา (ตรวจซ้ำอีกครั้งก่อนบันทึก)
-    const ok = await checkSlotAvailable(input.date, input.time);
-    if (!ok) {
-      return alert('ช่วงเวลานี้ถูกจองไปแล้ว กรุณาเลือกเวลาอื่น');
+
+    // กันกรณีคนอื่นจองไปก่อนหน้า (รีเฟรชสถานะล่าสุดก่อนส่ง)
+    try {
+      const latest = await fetchBookedTimes(input.date);
+      const latestSet = new Set(latest);
+      if (latestSet.has(input.time)) {
+        setBookedTimes(latestSet);
+        setInput((prev) => ({ ...prev, time: '' }));
+        return alert('ช่วงเวลานี้ถูกจองไปแล้ว กรุณาเลือกเวลาอื่น');
+      }
+    } catch (e) {
+      console.error('ตรวจสอบเวลาล่าสุดไม่สำเร็จ', e);
+      // ให้ปล่อยไปพยายามบันทึก (API ฝั่ง server จะกันซ้ำให้อีกชั้น)
     }
 
     try {
       setLoading(true);
+
       const payload: BookingInput = {
         name: input.name.trim(),
         phone: input.phone.trim(),
@@ -198,6 +216,7 @@ export default function Home() {
         slipUrl: input.slipUrl,
         adminEmail,
       };
+
       const docId = await addBooking(payload);
       setSuccessId(docId);
     } catch (err: any) {
@@ -237,14 +256,15 @@ export default function Home() {
   return (
     <main className="min-h-screen px-4 py-10 text-gray-100">
       <div className="mx-auto max-w-3xl">
-
         {/* header + logo */}
         <section className="mb-8">
           <div className="bg-white/5 backdrop-blur rounded-2xl border border-white/10 p-4 sm:p-5 shadow flex items-center gap-4">
             <div className="h-16 w-16 shrink-0 rounded-xl overflow-hidden bg-white/10 ring-1 ring-white/10 grid place-items-center">
-              {settings?.logoUrl
-                ? <img src={settings.logoUrl} alt="โลโก้ร้าน" className="h-full w-full object-contain" />
-                : <span className="text-xs text-gray-400">No Logo</span>}
+              {settings?.logoUrl ? (
+                <img src={settings.logoUrl} alt="โลโก้ร้าน" className="h-full w-full object-contain" />
+              ) : (
+                <span className="text-xs text-gray-400">No Logo</span>
+              )}
             </div>
             <div>
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
@@ -264,7 +284,7 @@ export default function Home() {
               <input
                 className="w-full rounded-lg bg-white/10 border border-white/10 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
                 value={input.name}
-                onChange={e => setInput({ ...input, name: e.target.value })}
+                onChange={(e) => setInput({ ...input, name: e.target.value })}
                 placeholder="พิมพ์ชื่อของคุณ"
               />
             </div>
@@ -273,7 +293,7 @@ export default function Home() {
               <input
                 className="w-full rounded-lg bg-white/10 border border-white/10 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
                 value={input.phone}
-                onChange={e => setInput({ ...input, phone: e.target.value })}
+                onChange={(e) => setInput({ ...input, phone: e.target.value })}
                 placeholder="เช่น 0812345678"
               />
             </div>
@@ -286,12 +306,16 @@ export default function Home() {
               <select
                 className="w-full rounded-lg bg-white/10 border border-white/10 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
                 value={input.service}
-                onChange={e => setInput({ ...input, service: e.target.value })}
+                onChange={(e) => setInput({ ...input, service: e.target.value })}
               >
-                <option value="" disabled>เลือกบริการ</option>
-                {(settings?.services?.length ? settings.services : DEFAULT_SERVICES).map(s =>
-                  <option key={s} value={s}>{s}</option>
-                )}
+                <option value="" disabled>
+                  เลือกบริการ
+                </option>
+                {(settings?.services?.length ? settings.services : DEFAULT_SERVICES).map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -301,7 +325,7 @@ export default function Home() {
                 type="date"
                 className="w-full rounded-lg bg-white/10 border border-white/10 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
                 value={input.date}
-                onChange={e => setInput({ ...input, date: e.target.value })}
+                onChange={(e) => setInput({ ...input, date: e.target.value })}
               />
             </div>
 
@@ -310,17 +334,20 @@ export default function Home() {
               <select
                 className="w-full rounded-lg bg-white/10 border border-white/10 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
                 value={input.time}
-                onChange={e => onChangeTime(e.target.value)}
+                onChange={(e) => onChangeTime(e.target.value)}
               >
-                <option value="" disabled>เลือกเวลา</option>
+                <option value="" disabled>
+                  {loadingBookings ? 'กำลังโหลดเวลา...' : 'เลือกเวลา'}
+                </option>
                 {timeOptions
-                  .filter(t => !bookedTimes.has(t)) // ซ่อนเวลาที่เต็ม
-                  .map(t => <option key={t} value={t}>{t}</option>)
-                }
+                  .filter((t) => !bookedTimes.has(t)) // ซ่อนเวลาที่เต็ม
+                  .map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
               </select>
-              <p className="text-xs text-gray-400 mt-1">
-                แสดงเฉพาะเวลาที่ว่าง (ทุก 30 นาที) — ไม่รวม “เวลาปิดร้าน”
-              </p>
+              <p className="text-xs text-gray-400 mt-1">แสดงเฉพาะเวลาที่ว่าง (ทุก 30 นาที) — ไม่รวม “เวลาปิดร้าน”</p>
             </div>
           </div>
 
@@ -331,7 +358,7 @@ export default function Home() {
               rows={4}
               className="w-full rounded-lg bg-white/10 border border-white/10 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
               value={input.notes}
-              onChange={e => setInput({ ...input, notes: e.target.value })}
+              onChange={(e) => setInput({ ...input, notes: e.target.value })}
               placeholder="รายละเอียดเพิ่มเติม"
             />
           </div>
@@ -341,7 +368,7 @@ export default function Home() {
             <h3 className="font-semibold mb-2">แนบสลิปโอน (บังคับ)</h3>
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <SlipUploadInline onUpload={(url: string) => setInput(prev => ({ ...prev, slipUrl: url }))} />
+                <SlipUploadInline onUpload={(url: string) => setInput((prev) => ({ ...prev, slipUrl: url }))} />
                 <p className="text-sm text-yellow-300 mt-2">* ต้องอัปโหลดสลิปก่อนจึงจะยืนยันการจองได้</p>
               </div>
               <div className="flex items-center justify-center">
