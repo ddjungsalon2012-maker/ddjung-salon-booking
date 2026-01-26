@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import AdminGuard from '@/components/AdminGuard';
+import AdminGuard from '@/components/AdminGate';
 import { setBookingStatus, BookingStatus } from '@/lib/admin';
 
 type Row = {

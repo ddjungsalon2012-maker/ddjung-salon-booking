@@ -1,36 +1,49 @@
 'use client';
 
-import { ReactNode, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 
-const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'ddjungsalon.2012@gmail.com';
-
-export default function AdminGuard({ children }: { children: ReactNode }) {
+export default function AdminGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const [checking, setChecking] = useState(true);
-  const [ok, setOk] = useState(false);
+  const pathname = usePathname();
+  const [ok, setOk] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      const isAdmin = !!user && user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-      setOk(isAdmin);
-      setChecking(false);
-      if (!isAdmin) {
-        router.replace('/admin/login');
-      }
-    });
-    return () => unsub();
-  }, [router]);
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      const adminEmail = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || '').toLowerCase().trim();
 
-  if (checking) {
+      // ยังไม่ล็อกอิน → ส่งไปหน้า login
+      if (!u) {
+        setOk(false);
+        if (pathname !== '/admin/login') router.replace('/admin/login');
+        return;
+      }
+
+      // มีล็อกอิน แต่ไม่ใช่แอดมิน → ออกจากระบบแล้วเด้งไปหน้า login
+      const userEmail = (u.email || '').toLowerCase().trim();
+      if (!adminEmail || userEmail !== adminEmail) {
+        await signOut(auth);
+        setOk(false);
+        router.replace('/admin/login');
+        return;
+      }
+
+      setOk(true);
+    });
+
+    return () => unsub();
+  }, [router, pathname]);
+
+  if (ok === null) {
     return (
-      <main className="min-h-screen grid place-items-center text-gray-200">
-        กำลังตรวจสอบสิทธิ์…
-      </main>
+      <div className="min-h-screen grid place-items-center text-gray-100">
+        กำลังตรวจสอบสิทธิ์แอดมิน…
+      </div>
     );
   }
 
-  return ok ? <>{children}</> : null;
+  if (!ok) return null;
+  return <>{children}</>;
 }
