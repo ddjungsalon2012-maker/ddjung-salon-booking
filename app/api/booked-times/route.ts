@@ -3,7 +3,6 @@ import admin from 'firebase-admin';
 
 function getAdmin() {
   if (admin.apps.length) return admin.app();
-
   return admin.initializeApp({
     credential: admin.credential.applicationDefault(),
   });
@@ -20,13 +19,13 @@ export async function GET(req: Request) {
   const app = getAdmin();
   const db = app.firestore();
 
-  const snap = await db
-    .collection('bookings')
-    .where('date', '==', date)
-    .get();
+  const snap = await db.collection('bookings').where('date', '==', date).get();
 
   const times = snap.docs
-    .map((d) => (d.data().time as string) || '')
+    .map((docSnap: admin.firestore.QueryDocumentSnapshot) => {
+      const data = docSnap.data() as { time?: string };
+      return data.time ?? '';
+    })
     .filter(Boolean);
 
   return NextResponse.json({ times });
