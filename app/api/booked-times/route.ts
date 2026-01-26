@@ -8,73 +8,36 @@ function getAdmin() {
   });
 }
 
-type BookingInput = {
-  name: string;
-  phone: string;
-  service: string;
-  date: string; // yyyy-mm-dd
-  time: string; // HH:mm
-  notes?: string;
-  deposit: number;
-  slipUrl: string;
-  adminEmail?: string;
-};
-
-export async function POST(req: Request) {
+export async function GET(req: Request) {
   try {
-    const body = (await req.json()) as Partial<BookingInput>;
-
-    const required = ['name', 'phone', 'service', 'date', 'time', 'deposit', 'slipUrl'] as const;
-    for (const k of required) {
-      if (!body[k]) {
-        return NextResponse.json({ error: `Missing ${k}` }, { status: 400 });
-      }
+    const { searchParams } = new URL(req.url);
+    const date = searchParams.get('date');
+    if (!date) {
+      return NextResponse.json({ error: 'Missing date' }, { status: 400 });
     }
-
-    const input: BookingInput = {
-      name: String(body.name).trim(),
-      phone: String(body.phone).trim(),
-      service: String(body.service),
-      date: String(body.date),
-      time: String(body.time),
-      notes: String(body.notes ?? '').trim(),
-      deposit: Number(body.deposit),
-      slipUrl: String(body.slipUrl),
-      adminEmail: body.adminEmail ? String(body.adminEmail) : undefined,
-    };
 
     const app = getAdmin();
     const db = app.firestore();
 
-    const slotId = `${input.date}_${input.time}`;
-    const slotRef = db.collection('slots').doc(slotId);
-    const bookingRef = db.collection('bookings').doc(); // สร้าง id ล่วงหน้า
+    const ref = db.collection('bookings');
+    const [sp, sc] = await Promise.all([
+      ref.where('date', '==', date).where('status', '==', 'Pending').get(),
+      ref.where('date', '==', date).where('status', '==', 'Confirmed').get(),
+    ]);
 
-    // ทำให้ “ล็อกเวลา + สร้าง booking” แบบ atomic กันจองซ้ำ
-    await db.runTransaction(async (tx) => {
-      const slotSnap = await tx.get(slotRef);
-      if (slotSnap.exists) {
-        throw new Error('ช่วงเวลานี้ถูกจองไปแล้ว กรุณาเลือกเวลาอื่น');
-      }
-
-      tx.set(slotRef, {
-        locked: true,
-        date: input.date,
-        time: input.time,
-        bookingId: bookingRef.id,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      tx.set(bookingRef, {
-        ...input,
-        status: 'Pending',
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+    const times = new Set<string>();
+    sp.forEach((d) => {
+      const t = d.get('time');
+      if (typeof t === 'string') times.add(t);
+    });
+    sc.forEach((d) => {
+      const t = d.get('time');
+      if (typeof t === 'string') times.add(t);
     });
 
-    return NextResponse.json({ id: bookingRef.id });
+    return NextResponse.json({ times: Array.from(times) });
   } catch (e: any) {
-    const msg = e?.message ?? String(e);
-    return NextResponse.json({ error: msg }, { status: 400 });
+    console.error('GET /api/booked-times error:', e);
+    return NextResponse.json({ error: e?.message || 'Server error' }, { status: 500 });
   }
 }
