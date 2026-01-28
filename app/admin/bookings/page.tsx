@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import AdminGuard from '@/components/AdminGate';
+import AdminGate from '@/components/AdminGate';
 import { setBookingStatus, BookingStatus } from '@/lib/admin';
 
 type Row = {
@@ -108,7 +108,7 @@ export default function AdminBookingsPage() {
   }
 
   return (
-    <AdminGuard>
+    <AdminGate>
       <main className="min-h-screen px-4 py-8 text-gray-100">
         <div className="mx-auto max-w-5xl">
           {/* ===== Header ===== */}
@@ -243,7 +243,7 @@ export default function AdminBookingsPage() {
           )}
         </div>
       </main>
-    </AdminGuard>
+    </AdminGate>
   );
 }
 
