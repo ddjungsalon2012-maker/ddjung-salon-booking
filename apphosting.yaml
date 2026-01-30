@@ -1,31 +1,34 @@
-# Settings for Backend (on Cloud Run).
 runConfig:
   minInstances: 0
   memoryMiB: 512
 
-# Environment variables and secrets.
 env:
-  # บรรทัดด้านล่างนี้คือส่วนสำคัญที่ทำให้ Build ผ่าน
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    secret: "AIzaSyB7UrNib4nu1O1b6HtOjOUpKgcM8g1TU84"
-  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: "ddjung-salon-v2.firebaseapp.com"
-  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: "ddjung-salon-v2"
-  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: "ddjung-salon-v2.firebasestorage.app"
-  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: "692498039840" # <--- ดูตัวเลขนี้ในไฟล์ firebaseConfig ของคุณแล้วมาเปลี่ยนให้ตรง
-  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: "1:692498039840:web:23bd3a15aed9f7bf052845" # <--- เอา App ID จริงๆ ของคุณมาใส่ตรงนี้
-
-    # กำหนดให้ใช้ค่าเหล่านี้ได้ทั้งตอนสร้างเว็บ (Build) และตอนคนกดเข้าเว็บ (Runtime)
+    secret: NEXT_PUBLIC_FIREBASE_API_KEY
     availability:
       - BUILD
       - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: "ddjung-salon-v2.firebaseapp.com"
+
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: "ddjung-salon-v2"
+
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: "ddjung-salon-v2.firebasestorage.app"
+
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "692498039840"
+
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "1:692498039840:web:23bd3a15aed9f7bf052845"
+
   - variable: NEXT_PUBLIC_ADMIN_EMAIL
     secret: NEXT_PUBLIC_ADMIN_EMAIL
+
   - variable: ADMIN_EMAIL
     secret: ADMIN_EMAIL
+
   - variable: NEXT_PUBLIC_PROMPTPAY
     secret: NEXT_PUBLIC_PROMPTPAY
