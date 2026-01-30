@@ -1,15 +1,22 @@
-// app/api/admin/bookings/[id]/route.ts
+// app/api/admin/bookings/[id]/status/route.ts
 import { NextResponse } from 'next/server';
 import { getAdminDb, verifyAdminFromRequest } from '@/lib/firebaseAdmin';
 
-export async function DELETE(req: Request, ctx: { params: { id: string } }) {
+export async function PATCH(
+  req: Request,
+  ctx: { params: Promise<{ id: string }> }
+) {
   try {
     const auth = await verifyAdminFromRequest(req);
     if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-    const id = ctx.params.id;
+    const { id } = await ctx.params;
+
+    const body = await req.json();
+    const status = body?.status;
+
     const db = getAdminDb();
-    await db.collection('bookings').doc(id).delete();
+    await db.collection('bookings').doc(id).update({ status });
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {
