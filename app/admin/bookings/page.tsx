@@ -13,6 +13,7 @@ import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import AdminGate from '@/components/AdminGate';
 import { setBookingStatus, BookingStatus } from '@/lib/admin';
+import Link from 'next/link';
 
 type Row = {
   id: string;
@@ -32,6 +33,13 @@ const STATUS_COLORS: Record<BookingStatus, string> = {
   Pending: 'bg-yellow-500/20 text-yellow-300',
   Confirmed: 'bg-emerald-500/20 text-emerald-300',
   Rejected: 'bg-rose-500/20 text-rose-300',
+};
+
+// ✅ แปลงสถานะเป็นไทย
+const STATUS_TH: Record<BookingStatus, string> = {
+  Pending: 'รอตรวจสอบ',
+  Confirmed: 'อนุมัติแล้ว',
+  Rejected: 'ปฏิเสธ',
 };
 
 export default function AdminBookingsPage() {
@@ -112,9 +120,28 @@ export default function AdminBookingsPage() {
       <main className="min-h-screen px-4 py-8 text-gray-100">
         <div className="mx-auto max-w-5xl">
           {/* ===== Header ===== */}
-          <header className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold">Admin – รายการจอง</h1>
-            <div className="flex items-center gap-3">
+          <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold">หลังบ้าน – รายการจอง</h1>
+
+              {/* ✅ ปุ่มไปหน้าตั้งค่า + สรุปรายเดือน */}
+              <div className="hidden md:flex items-center gap-2 ml-2">
+                <Link
+                  href="/admin/settings"
+                  className="px-3 py-1 rounded bg-white/10 hover:bg-white/15 text-sm"
+                >
+                  ตั้งค่า
+                </Link>
+                <Link
+                  href="/admin/monthly"
+                  className="px-3 py-1 rounded bg-white/10 hover:bg-white/15 text-sm"
+                >
+                  สรุปรายเดือน
+                </Link>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
               <select
                 className="rounded-md bg-white/10 border border-white/10 px-2 py-1"
                 value={qStatus}
@@ -125,6 +152,23 @@ export default function AdminBookingsPage() {
                 <option value="Confirmed">อนุมัติแล้ว</option>
                 <option value="Rejected">ปฏิเสธ</option>
               </select>
+
+              {/* ✅ ปุ่มลัดบนมือถือ */}
+              <div className="flex md:hidden gap-2">
+                <Link
+                  href="/admin/settings"
+                  className="px-3 py-1 rounded bg-white/10 hover:bg-white/15 text-sm"
+                >
+                  ตั้งค่า
+                </Link>
+                <Link
+                  href="/admin/monthly"
+                  className="px-3 py-1 rounded bg-white/10 hover:bg-white/15 text-sm"
+                >
+                  สรุปรายเดือน
+                </Link>
+              </div>
+
               <button
                 onClick={handleLogout}
                 className="px-3 py-1 rounded bg-red-600 hover:bg-red-700 text-white text-sm"
@@ -161,7 +205,10 @@ export default function AdminBookingsPage() {
                       <td className="p-3">{r.name}</td>
                       <td className="p-3">{r.service}</td>
                       <td className="p-3">
-                        <span className={`px-2 py-1 rounded ${STATUS_COLORS[r.status]}`}>{r.status}</span>
+                        {/* ✅ แสดงสถานะเป็นไทย */}
+                        <span className={`px-2 py-1 rounded ${STATUS_COLORS[r.status]}`}>
+                          {STATUS_TH[r.status]}
+                        </span>
                       </td>
                       <td className="p-3">
                         {r.slipUrl ? (
@@ -206,7 +253,11 @@ export default function AdminBookingsPage() {
                     <RowItem label="โน้ต" value={detail.notes || '-'} />
                     <RowItem
                       label="สถานะ"
-                      value={<span className={`px-2 py-1 rounded ${STATUS_COLORS[detail.status]}`}>{detail.status}</span>}
+                      value={
+                        <span className={`px-2 py-1 rounded ${STATUS_COLORS[detail.status]}`}>
+                          {STATUS_TH[detail.status]}
+                        </span>
+                      }
                     />
                   </div>
 
@@ -214,7 +265,11 @@ export default function AdminBookingsPage() {
                     <p className="text-sm mb-2">สลิปโอน</p>
                     {detail.slipUrl ? (
                       <a href={detail.slipUrl} target="_blank" rel="noreferrer">
-                        <img src={detail.slipUrl} alt="slip" className="w-full h-[360px] object-contain bg-black/30 rounded" />
+                        <img
+                          src={detail.slipUrl}
+                          alt="slip"
+                          className="w-full h-[360px] object-contain bg-black/30 rounded"
+                        />
                       </a>
                     ) : (
                       <div className="h-[360px] grid place-items-center text-gray-400">ไม่มีสลิปแนบ</div>
