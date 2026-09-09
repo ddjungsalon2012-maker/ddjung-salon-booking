@@ -1,12 +1,7 @@
 import { NextResponse } from 'next/server';
 import admin from 'firebase-admin';
-
-function getAdmin() {
-  if (admin.apps.length) return admin.app();
-  return admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
-  });
-}
+import { getAdminDb } from '@/lib/firebaseAdmin';
+import { notifyBooking } from '@/lib/lineNotification';
 
 export async function POST(req: Request) {
   try {
@@ -14,45 +9,52 @@ export async function POST(req: Request) {
 
     const {
       name, phone, service, date, time,
-      notes = '', status = 'Pending',
+      notes = '',
       deposit = 0, slipUrl, adminEmail = ''
     } = body || {};
 
-    if (!name || !phone || !service || !date || !time || !slipUrl) {
+    if (![name, phone, service, date, time, slipUrl].every(value => typeof value === 'string' && value.trim())) {
       return NextResponse.json({ error: 'ข้อมูลไม่ครบ (name/phone/service/date/time/slipUrl)' }, { status: 400 });
     }
 
-    const app = getAdmin();
-    const db = app.firestore();
+    const db = getAdminDb();
 
     // เช็กซ้ำกันจองซ้อน: Pending/Confirmed
     const ref = db.collection('bookings');
-    const [sp, sc] = await Promise.all([
-      ref.where('date', '==', date).where('time', '==', time).where('status', '==', 'Pending').get(),
-      ref.where('date', '==', date).where('time', '==', time).where('status', '==', 'Confirmed').get(),
-    ]);
-
-    if (!sp.empty || !sc.empty) {
-      return NextResponse.json({ error: 'ช่วงเวลานี้ถูกจองไปแล้ว' }, { status: 409 });
-    }
-
-    const docRef = await ref.add({
+    const docRef = ref.doc();
+    const saved = await db.runTransaction(async transaction => {
+      // A date-only query avoids requiring an undeployed composite index.
+      const existing = await transaction.get(ref.where('date', '==', date));
+      if (existing.docs.some(doc => doc.get('time') === time && ['Pending', 'Confirmed'].includes(doc.get('status')))) return false;
+      transaction.create(docRef, {
       name: String(name).trim(),
       phone: String(phone).trim(),
       service,
       date,
       time,
       notes: String(notes || '').trim(),
-      status,
+      status: 'Pending',
       deposit: Number(deposit) || 0,
       slipUrl,
       adminEmail,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      lineNotificationStatus: 'pending',
+      });
+      return true;
     });
+    if (!saved) return NextResponse.json({ error: 'ช่วงเวลานี้ถูกจองไปแล้ว กรุณาเลือกเวลาใหม่' }, { status: 409 });
+
+    // Notification failure must not report an already-saved booking as failed.
+    const notificationStatus = await notifyBooking({ id: docRef.id, service, date, time });
+    try {
+      await docRef.update({ lineNotificationStatus: notificationStatus });
+    } catch {
+      console.error('Could not record LINE notification status', { bookingId: docRef.id });
+    }
 
     return NextResponse.json({ id: docRef.id });
   } catch (e: any) {
     console.error('POST /api/bookings error:', e);
-    return NextResponse.json({ error: e?.message || 'Server error' }, { status: 500 });
+    return NextResponse.json({ error: 'ระบบจองขัดข้องชั่วคราว กรุณาติดต่อร้านผ่าน LINE @ddjung', code: 'BOOKING_UNAVAILABLE' }, { status: 503 });
   }
 }

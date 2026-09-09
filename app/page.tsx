@@ -2,6 +2,7 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { addBooking } from '@/lib/booking';
@@ -133,6 +134,7 @@ export default function Home() {
 
   /* ฟอร์มรับข้อมูล */
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [input, setInput] = useState<Input>({
     name: '',
     phone: '',
@@ -158,6 +160,7 @@ export default function Home() {
   /* โหลดการจองของวันที่เลือก เพื่อซ่อนเวลาที่ถูกจองแล้ว */
   const [loadingBookings, setLoadingBookings] = useState(false);
   const [bookedTimes, setBookedTimes] = useState<string[]>([]);
+  const [availabilityError, setAvailabilityError] = useState('');
 
   useEffect(() => {
     if (!input.date) {
@@ -165,30 +168,36 @@ export default function Home() {
       return;
     }
 
+    const controller = new AbortController();
     const fetchBookedTimes = async () => {
       setLoadingBookings(true);
+      setAvailabilityError('');
       try {
         const res = await fetch(
           `/api/booked-times?date=${encodeURIComponent(input.date)}`,
-          { cache: 'no-store' }
+          { cache: 'no-store', signal: controller.signal }
         );
         if (!res.ok) {
-          // อย่าให้หน้าแตก แค่โชว์ว่าว่างทั้งหมด
-          console.error('Error fetching booked times:', await res.text());
+          if (controller.signal.aborted) return;
+          setAvailabilityError('ตรวจสอบเวลาว่างไม่ได้ กรุณาลองเลือกวันที่ใหม่ หรือติดต่อร้านผ่าน LINE');
           setBookedTimes([]);
           return;
         }
         const data = (await res.json()) as { times?: string[] };
+        if (controller.signal.aborted) return;
         setBookedTimes(Array.isArray(data.times) ? data.times : []);
       } catch (err) {
+        if (controller.signal.aborted) return;
+        setAvailabilityError('ตรวจสอบเวลาว่างไม่ได้ กรุณาตรวจอินเทอร์เน็ตแล้วเลือกวันที่ใหม่');
         console.error('Error fetching booked times:', err);
         setBookedTimes([]);
       } finally {
-        setLoadingBookings(false);
+        if (!controller.signal.aborted) setLoadingBookings(false);
       }
     };
 
     fetchBookedTimes();
+    return () => controller.abort();
   }, [input.date]);
 
   /* ตัวเลือกเวลา (ตาม settings) */
@@ -212,6 +221,12 @@ export default function Home() {
   /* ส่งฟอร์ม */
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (loading) return;
+    setSubmitError('');
+    if (loadingBookings || availabilityError) {
+      setSubmitError('ยังตรวจสอบเวลาว่างไม่สำเร็จ กรุณาเลือกวันที่ใหม่หรือติดต่อร้าน');
+      return;
+    }
     if (!input.slipUrl) {
       alert('กรุณาอัปโหลดสลิปก่อนยืนยันการจอง');
       return;
@@ -237,7 +252,7 @@ export default function Home() {
       router.push(`/success/${docId}`);
     } catch (err) {
       console.error(err);
-      alert('บันทึกการจองไม่สำเร็จ');
+      setSubmitError(err instanceof Error ? err.message : 'บันทึกการจองไม่สำเร็จ กรุณาติดต่อร้าน');
     } finally {
       setLoading(false);
     }
@@ -306,7 +321,7 @@ export default function Home() {
                   type="date"
                   className="w-full rounded-lg bg-white/10 border border-white/10 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
                   value={input.date}
-                  onChange={(e) => setInput({ ...input, date: e.target.value })}
+                  onChange={(e) => setInput({ ...input, date: e.target.value, time: '' })}
                 />
               </div>
 
@@ -314,7 +329,7 @@ export default function Home() {
               <div>
                 <label className="block text-sm mb-1">เวลา</label>
                 <SelectFull
-                  options={timeOptions.filter((t: string) => !bookedTimes.includes(t))}
+                  options={loadingBookings || availabilityError ? [] : timeOptions.filter((t: string) => !bookedTimes.includes(t))}
                   value={input.time}
                   onChange={(v) => onChangeTime(v)}
                   placeholder={
@@ -368,11 +383,17 @@ export default function Home() {
               </span>
             </div>
 
+            {(availabilityError || submitError) && (
+              <div role="alert" className="rounded-xl border border-red-400/40 bg-red-950/30 p-4 text-red-100">
+                <p>{submitError || availabilityError}</p>
+                <Link href="/line" className="mt-2 inline-flex min-h-12 items-center underline">ติดต่อร้านผ่าน LINE @ddjung</Link>
+              </div>
+            )}
             {/* ปุ่มส่ง */}
             <div className="pt-2">
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || loadingBookings || !!availabilityError}
                 className="btn-primary disabled:opacity-60"
               >
                 {loading ? 'กำลังบันทึก...' : 'ยืนยันการจอง'}

@@ -3,7 +3,25 @@ import admin from 'firebase-admin';
 
 export function getAdminApp() {
   if (admin.apps.length) return admin.app();
+  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+  if (clientEmail || privateKey) {
+    if (!projectId || !clientEmail || !privateKey) {
+      throw new Error('Incomplete Firebase Admin configuration');
+    }
+    return admin.initializeApp({
+      projectId,
+      credential: admin.credential.cert({
+        projectId,
+        clientEmail,
+        privateKey: privateKey.replace(/\\n/g, '\n'),
+      }),
+    });
+  }
+  // Google-hosted environments can still use their attached service account.
   return admin.initializeApp({
+    projectId,
     credential: admin.credential.applicationDefault(),
   });
 }

@@ -1,43 +1,19 @@
 import { NextResponse } from 'next/server';
-import admin from 'firebase-admin';
-
-function getAdmin() {
-  if (admin.apps.length) return admin.app();
-  return admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
-  });
-}
+import { getAdminDb } from '@/lib/firebaseAdmin';
 
 export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const date = searchParams.get('date');
+  if (!date) return NextResponse.json({ error: 'Missing date' }, { status: 400 });
   try {
-    const { searchParams } = new URL(req.url);
-    const date = searchParams.get('date');
-    if (!date) {
-      return NextResponse.json({ error: 'Missing date' }, { status: 400 });
-    }
-
-    const app = getAdmin();
-    const db = app.firestore();
-
-    const ref = db.collection('bookings');
-    const [sp, sc] = await Promise.all([
-      ref.where('date', '==', date).where('status', '==', 'Pending').get(),
-      ref.where('date', '==', date).where('status', '==', 'Confirmed').get(),
-    ]);
-
+    const snap = await getAdminDb().collection('bookings').where('date', '==', date).get();
     const times = new Set<string>();
-    sp.forEach((d) => {
-      const t = d.get('time');
-      if (typeof t === 'string') times.add(t);
+    snap.docs.forEach(doc => {
+      if (['Pending', 'Confirmed'].includes(doc.get('status')) && typeof doc.get('time') === 'string') times.add(doc.get('time'));
     });
-    sc.forEach((d) => {
-      const t = d.get('time');
-      if (typeof t === 'string') times.add(t);
-    });
-
-    return NextResponse.json({ times: Array.from(times) });
-  } catch (e: any) {
-    console.error('GET /api/booked-times error:', e);
-    return NextResponse.json({ error: e?.message || 'Server error' }, { status: 500 });
+    return NextResponse.json({ times: [...times].sort() });
+  } catch {
+    console.error('GET /api/booked-times failed');
+    return NextResponse.json({ error: 'ตรวจสอบเวลาว่างไม่ได้ กรุณาลองใหม่หรือติดต่อร้านผ่าน LINE @ddjung' }, { status: 503 });
   }
 }
